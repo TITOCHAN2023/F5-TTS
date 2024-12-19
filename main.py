@@ -40,7 +40,7 @@ def upload_voice(voicename):
         for file in files:
             file.save(f"src/f5_tts/upload_audio/{voicename}/{file.filename}")
 
-        voice_data= VoiceSchema(name=voicename,positon=f"upload_audio/{voicename}/{file.filename}")
+        voice_data= VoiceSchema(name=voicename,position=f"upload_audio/{voicename}/{file.filename}")
 
         conn.add(voice_data)
         conn.commit()
@@ -55,10 +55,15 @@ def tts():
         voice = conn.query(VoiceSchema).filter(VoiceSchema.name ==voicename).first()
         if not voice:
             return jsonify({"detail": "Voice not found"}), 404
-        position = voice.positon
+        position = voice.position
 
-    if not voicename or not content:
-        return jsonify({"detail": "Missing 'voicename' or 'content'"}), 400
+        if not voicename or not content:
+            return jsonify({"detail": "Missing 'voicename' or 'content'"}), 400
+        
+        position_data= conn.query(PositionSchema).filter(PositionSchema.content ==content).first()
+        if position_data:
+            return jsonify({"url": position_data.content_position}), 200
+    
 
     import random
     name=voicename+content[0:5]+str(random.random())
@@ -79,6 +84,11 @@ def tts():
 
         logger.info(f"Generated audio saved to: {generated_audio_path}{name}.wav")
         audio_url = url_for('static_files', filename=f"{name}.wav", _external=True)
+
+        with session() as conn:
+            position_data = PositionSchema(content=content, content_position=audio_url)
+            conn.add(position_data)
+            conn.commit()
 
         return jsonify({"url": audio_url}), 200
 
