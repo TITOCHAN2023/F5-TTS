@@ -47,7 +47,7 @@ def upload_voice(voicename):
 
     return jsonify({"message": "Upload Success"}), 200
 @app.route('/tts', methods=['POST'])
-def tts():
+async def tts():
     voicename = request.form.get('voicename')
     content = request.form.get('content')
 
@@ -60,7 +60,7 @@ def tts():
         if not voicename or not content:
             return jsonify({"detail": "Missing 'voicename' or 'content'"}), 400
         
-        position_data= conn.query(PositionSchema).filter(PositionSchema.content ==content).first()
+        position_data= conn.query(PositionSchema).filter(PositionSchema.content ==voicename+content).first()
         if position_data:
             return jsonify({"url": position_data.content_position}), 200
     
@@ -86,7 +86,7 @@ def tts():
         audio_url = url_for('static_files', filename=f"{name}.wav", _external=True)
 
         with session() as conn:
-            position_data = PositionSchema(content=content, content_position=audio_url)
+            position_data = PositionSchema(content=voicename+content, content_position=audio_url)
             conn.add(position_data)
             conn.commit()
 
