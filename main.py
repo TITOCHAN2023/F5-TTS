@@ -1,3 +1,4 @@
+
 from flask import Flask, request, jsonify, send_file, send_from_directory,url_for
 import os
 
@@ -5,6 +6,7 @@ from logger import logger
 from middleware.mysql import session
 from middleware.mysql.models.audio_voice import VoiceSchema
 from middleware.mysql.models.audio_position import PositionSchema
+from middleware.hash.hash import hash_string 
 from importlib.resources import files
 
 app = Flask(__name__)
@@ -64,9 +66,9 @@ async def tts():
         if position_data:
             return jsonify({"url": position_data.content_position}), 200
     
-
     import random
-    name=voicename+content[0:5]+str(random.random())
+    name = voicename + content[:5]+str(random.random())
+    name = hash_string(name)
     generated_audio_path = f"output_dir/{name}/"
     os.makedirs("src/f5_tts/"+generated_audio_path, exist_ok=True)
 
@@ -90,7 +92,7 @@ async def tts():
             conn.add(position_data)
             conn.commit()
 
-        return jsonify({"url": audio_url}), 200
+        return jsonify({"url": audio_url}), 200 
 
     except Exception as e:
         return jsonify({"detail": f"Error generating audio: {str(e)}"}), 500

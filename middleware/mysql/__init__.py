@@ -38,7 +38,7 @@ def init_mysql_session() -> sessionmaker[Session]:
 
 
     password = quote_plus(pgsqldb_config["password"])
-    engine = create_engine(f'postgresql+psycopg2://{pgsqldb_config["user"]}:{password}@{pgsqldb_config["host"]}:{pgsqldb_config["port"]}/{pgsqldb_config["dbname"]}',echo=True,client_encoding='utf8')
+    engine = create_engine(f'postgresql+psycopg2://{pgsqldb_config["user"]}:{password}@{pgsqldb_config["host"]}:{pgsqldb_config["port"]}/{pgsqldb_config["dbname"]}',echo=False,client_encoding='utf8')
 
 
     session = sessionmaker(bind=engine)
