@@ -3,6 +3,7 @@ from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import Manager
 import multiprocessing
+from multiprocessing import current_process
 import multiprocessing.resource_tracker
 import multiprocessing.spawn
 import multiprocessing.util
@@ -36,6 +37,8 @@ host = os.getenv("URL", "0.0.0.0")
 app = Quart(__name__)
 scheduler = AsyncIOScheduler()
 app = cors(app, allow_origin="*")
+future_map = defaultdict(set)
+task_control = Manager().dict({})
 
 from src.f5_tts.api import F5TTS
 
@@ -124,16 +127,7 @@ async def tts():
     content = form_data.get('content')
 
 
-    loop = asyncio.get_event_loop()
-    future = executor.submit(
-        process_tts,
-        content, 
-        voicename
-    )
-
-    res = await loop.run_in_executor(
-        None, future.result
-    )
+    res = await process_tts(content=content,voicename=voicename)
 
 
     return res
@@ -143,7 +137,7 @@ class TaskCancelledException(Exception):
 
 
 
-def process_tts(content, voicename):
+async def process_tts(content, voicename):
 
     with session() as conn:
         voice = conn.query(VoiceSchema).filter(VoiceSchema.name == voicename).first()
@@ -166,16 +160,27 @@ def process_tts(content, voicename):
 
     logger.info(f"Generating audio for: {content}")
 
+    
+
     try:
         logger.info(f"tts_worker,id:{name} 开始推理...")
 
-        f5tts.infer(
+        loop = asyncio.get_event_loop()
+        future = executor.submit(
+            tts_run,
             ref_file=str(files("f5_tts").joinpath(position)),
             ref_text="",
             gen_text=content,
             file_wave=str(files("f5_tts").joinpath(f"{generated_audio_path}{name}.wav")),
             file_spect=str(files("f5_tts").joinpath(f"{generated_audio_path}{name}.png")),
-            seed=-1  
+            seed=-1 ,
+            index=name,
+            request_id=name,
+            task_control_dict=task_control,
+        )
+
+        idx = await loop.run_in_executor(
+            None, future.result
         )
 
         logger.info(f"Generated audio saved to: {generated_audio_path}{name}.wav")
@@ -193,6 +198,57 @@ def process_tts(content, voicename):
     except Exception as e:
         raise abort(500, f"Error generating audio: {str(e)}")
     
+
+
+
+
+def tts_run(
+            ref_file:str,
+            ref_text:str,
+            gen_text:str,
+            file_wave:str,
+            file_spect:str,
+            seed ,
+            index:str,
+            request_id:str,
+            task_control_dict: dict = None
+        ):
+
+
+    logger.info(f"运行任务 {index},request_id {request_id}")
+
+    try:
+        pid = os.getpid()
+        if task_control_dict[request_id]:
+            logger.info(f"Worker {pid} ，任务{request_id}_{index}在执行前被取消")
+            return index
+    except Exception as e:
+        logger.warning(f"failed to read task_control")
+
+
+    try:
+        logger.info(f"tts_worker,id:{index} 开始推理...")
+
+        f5tts.infer(
+            ref_file=ref_file,
+            ref_text=ref_text,
+            gen_text=gen_text,
+            file_wave=file_wave,
+            file_spect=file_spect,
+            seed=seed 
+        )
+
+    except TaskCancelledException:
+        logger.info(f"tts_worker,id:{index} 任务被取消")
+        return index
+    except Exception as e:
+        logger.info(f"tts_worker,id:{index} 任务执行失败 {e}")
+        raise
+
+
+
+
+
 @app.route('/static/<filename>')
 async def static_files(filename):
     name, ext = os.path.splitext(filename)
@@ -244,7 +300,7 @@ def clean_up():
 if __name__ == '__main__':
     dummy_workers()
     try:
-        app.run(host='0.0.0.0', port=8178)
+        app.run(host='0.0.0.0', port=8175,debug=False)
     finally:
         clean_up()
         logger.info("tts服务器已关闭")

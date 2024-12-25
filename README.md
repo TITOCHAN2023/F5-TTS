@@ -10,4 +10,5 @@ PGSQLDB_CONFIG=" {'dbname': 'xxx','user': 'postgres','password': 'xxxxx','host':
 
 URL='xxxxxxx:xxx'
 
+CUDA_VISIBLE_DEVICES=5 python multi-main.py 
 ```
