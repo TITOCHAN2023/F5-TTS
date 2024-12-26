@@ -108,7 +108,7 @@ async def upload_voice(voicename):
             upload_dir = f"src/f5_tts/upload_audio/{voicename}"
             os.makedirs(upload_dir, exist_ok=True)
 
-            file.save(f"src/f5_tts/upload_audio/{voicename}/{file.filename}")
+            await file.save(f"src/f5_tts/upload_audio/{voicename}/{file.filename}")
 
             voice_data = VoiceSchema(name=voicename, position=f"upload_audio/{voicename}/{file.filename}")
 
