@@ -89,7 +89,7 @@ async def shutdown():
 def test():
     return jsonify({"message": "Test endpoint"}), 200
 @app.route('/root/upload/<voicename>', methods=['POST'])
-def upload_voice(voicename):
+async def upload_voice(voicename):
     try:
         with session() as conn:
             voice = conn.query(VoiceSchema).filter(VoiceSchema.name == voicename).first()
@@ -97,17 +97,18 @@ def upload_voice(voicename):
                 logger.error(f"Voice Name has already been used: {voicename}")
                 return Response('{"detail": "Voice Name has already been used"}', status=409, mimetype='application/json')
 
-            if 'files' not in request.files:
+            
+            # 异步获取上传的文件
+            files = await request.files  # 直接异步访问 files 属性
+            if 'files' not in files:
                 return Response('{"detail": "No file part"}', status=400, mimetype='application/json')
-
-            files = request.files.getlist('files')
-            if not files or files[0].filename == '':
-                return Response('{"detail": "No selected file"}', status=400, mimetype='application/json')
+            
+            file = files['files']  # 获取上传的文件
 
             upload_dir = f"src/f5_tts/upload_audio/{voicename}"
             os.makedirs(upload_dir, exist_ok=True)
-            for file in files:
-                file.save(f"src/f5_tts/upload_audio/{voicename}/{file.filename}")
+
+            file.save(f"src/f5_tts/upload_audio/{voicename}/{file.filename}")
 
             voice_data = VoiceSchema(name=voicename, position=f"upload_audio/{voicename}/{file.filename}")
 
@@ -200,8 +201,6 @@ async def process_tts(content, voicename):
     
 
 
-
-
 def tts_run(
             ref_file:str,
             ref_text:str,
@@ -244,8 +243,6 @@ def tts_run(
     except Exception as e:
         logger.info(f"tts_worker,id:{index} 任务执行失败 {e}")
         raise
-
-
 
 
 
