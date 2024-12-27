@@ -42,6 +42,11 @@ task_control = Manager().dict({})
 
 from src.f5_tts.api import F5TTS
 
+class TaskCancelledException(Exception):
+    pass
+
+
+
 def init_worker():
     global f5tts,infer
     f5tts = F5TTS()
@@ -73,9 +78,6 @@ def dummy_workers():
 def dummy_task():
     logger.info("进程初始化完成")
 
-
-
-
 @app.before_serving
 async def startup():
     # 在app启动服务前启动scheduler
@@ -88,6 +90,7 @@ async def shutdown():
 @app.route('/test', methods=['GET'])
 def test():
     return jsonify({"message": "Test endpoint"}), 200
+
 @app.route('/root/upload/<voicename>', methods=['POST'])
 async def upload_voice(voicename):
     try:
@@ -133,12 +136,8 @@ async def tts():
 
     return res
 
-class TaskCancelledException(Exception):
-    pass
-
-
-
 async def process_tts(content, voicename):
+
 
     with session() as conn:
         voice = conn.query(VoiceSchema).filter(VoiceSchema.name == voicename).first()
@@ -153,9 +152,11 @@ async def process_tts(content, voicename):
         if position_data:
             return Response(f'{{"url": "{position_data.content_position}"}}', status=200, mimetype='application/json')
     
-    import random
     name = voicename + content#+str(random.random())
     name = hash_string(name)
+    task_control[name] = False
+
+
     generated_audio_path = f"output_dir/{name}/"
     os.makedirs("src/f5_tts/" + generated_audio_path, exist_ok=True)
 
