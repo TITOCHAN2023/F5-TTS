@@ -9,6 +9,7 @@ import multiprocessing.spawn
 import multiprocessing.util
 import os
 import signal
+import cn2an
 
 
 # 第三方库导入
@@ -58,7 +59,7 @@ def init_worker():
 
 
 # 初始化进程池
-max_workers = 4
+max_workers = 1
 executor = ProcessPoolExecutor(
     max_workers=max_workers,
     initializer=init_worker,
@@ -130,7 +131,9 @@ async def tts():
     voicename = form_data.get('voicename')
     content = form_data.get('content')
 
-
+    import re
+    content=re.sub(r'\(.*?\)', '', content)
+    content = cn2an.transform(content, "an2cn")
     res = await process_tts(content=content,voicename=voicename)
 
 
